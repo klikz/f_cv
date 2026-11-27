@@ -1,0 +1,23 @@
+[Unit]
+Description=F_CV — API (FastAPI)
+PartOf=fcv.target
+After=network-online.target postgresql.service redis-server.service fcv-migrate.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service fcv-migrate.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@/backend
+EnvironmentFile=@ROOT@/.env
+ExecStart=@ROOT@/backend/.venv/bin/fcv api
+Restart=always
+WatchdogSec=30
+NotifyAccess=main
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+Nice=0
+
+[Install]
+WantedBy=fcv.target

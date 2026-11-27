@@ -102,6 +102,7 @@ Dekod backend'i abstraksiya qilinadi va **1-bosqich benchmarkida tanlanadi**:
 2. **NVDEC (RTX)** — bitta process ichida, bitta CUDA konteksti; ~1.5–2 GB VRAM oladi (taxmin).
 3. **CPU** — zaxira; 12700K qisman ko'tara oladi.
 
+- **Benchmark natijasi (1-bosqich):** NVDEC chiqarildi — PyAV har oqimga alohida CUDA konteksti ochadi (~400 MB VRAM/oqim). Tanlov: **CPU** (VAAPI — serverda iGPU bo'lsa). 15 sub + 15 main ≈ 2 yadro (sintetik oqimda).
 - Kadrlar dekoderning o'zida **10 fps gacha siyraklashtiriladi**, keyin xotiraga ko'chiriladi (25 fps ni to'liq ko'chirish ortiqcha).
 - Kamera qo'shilganda har oqim uchun `ffprobe` orqali kodek/o'lcham/FPS avto aniqlanadi va UI da ko'rsatiladi.
 - Har oqimga **bitta RTSP ulanish**, faqat `video-service` ulanadi (boshqa hech bir komponent kameraga ulanmaydi).

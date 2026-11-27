@@ -1,0 +1,304 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Inter — loyiha ichida (internetsiz), o'zgaruvchan shrift */
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * DIZAYN TOKENLARI — yagona manba (PLAN.md 4.1.4).
+ * Komponentlarda "qo'lda" rang/o'lcham yozilmaydi: faqat shu tokenlar
+ * (Tailwind klasslari: bg-background, text-success, rounded-md, gap-2 ...).
+ *
+ * Masofa shkalasi: Tailwind standart (4px asos: 1 = 4px, 2 = 8px ...).
+ */
+
+@theme inline {
+  /* Shrift */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+
+  /* Shrift o'lchamlari — ixcham interfeys uchun biroz kichikroq shkala */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+
+  /* Asosiy ranglar */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Holat ranglari (hamma joyda bir xil, 4.1.4) */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-neutral: var(--neutral);
+  --color-neutral-muted: var(--neutral-muted);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+
+  /* Video ustidagi AI qatlami */
+  --color-overlay-roi: var(--overlay-roi);
+  --color-overlay-line: var(--overlay-line);
+  --color-overlay-box: var(--overlay-box);
+  --color-overlay-label-bg: var(--overlay-label-bg);
+  --color-video-bg: var(--video-bg);
+
+  /* Grafiklar */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Yon menyu */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Soyalar */
+  --shadow-xs: var(--shadow-xs-value);
+  --shadow-sm: var(--shadow-sm-value);
+  --shadow-md: var(--shadow-md-value);
+  --shadow-lg: var(--shadow-lg-value);
+
+  /* Animatsiya vaqtlari (150–250 ms) */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 250ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --animate-count-bump: count-bump var(--duration-slow) var(--ease-standard);
+  --animate-line-flash: line-flash 600ms ease-out;
+
+  @keyframes count-bump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+  @keyframes line-flash {
+    0%, 100% { opacity: 1; }
+    30% { opacity: 0.25; }
+  }
+}
+
+/* ---------- Yorug' mavzu ---------- */
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.985 0.002 250);
+  --foreground: oklch(0.2 0.015 255);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.55 0.19 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.005 255);
+  --secondary-foreground: oklch(0.25 0.015 255);
+  --muted: oklch(0.955 0.005 255);
+  --muted-foreground: oklch(0.5 0.015 255);
+  --accent: oklch(0.94 0.012 255);
+  --accent-foreground: oklch(0.25 0.015 255);
+  --destructive: oklch(0.56 0.21 25);
+  --border: oklch(0.905 0.007 255);
+  --input: oklch(0.88 0.008 255);
+  --ring: oklch(0.55 0.19 258 / 60%);
+
+  --success: oklch(0.58 0.15 150);
+  --success-foreground: oklch(0.99 0 0);
+  --success-muted: oklch(0.58 0.15 150 / 12%);
+  --warning: oklch(0.68 0.15 70);
+  --warning-foreground: oklch(0.2 0.03 70);
+  --warning-muted: oklch(0.75 0.15 75 / 16%);
+  --danger: oklch(0.56 0.21 25);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.56 0.21 25 / 12%);
+  --neutral: oklch(0.6 0.01 255);
+  --neutral-muted: oklch(0.6 0.01 255 / 14%);
+  --info: oklch(0.55 0.19 258);
+  --info-foreground: oklch(0.99 0 0);
+  --info-muted: oklch(0.55 0.19 258 / 12%);
+
+  --overlay-roi: oklch(0.8 0.15 220);
+  --overlay-line: oklch(0.85 0.17 90);
+  --overlay-box: oklch(0.78 0.17 150);
+  --overlay-label-bg: oklch(0.15 0.01 255 / 78%);
+  --video-bg: oklch(0.16 0.01 255);
+
+  --chart-1: oklch(0.55 0.19 258);
+  --chart-2: oklch(0.6 0.15 150);
+  --chart-3: oklch(0.7 0.15 70);
+  --chart-4: oklch(0.58 0.2 330);
+  --chart-5: oklch(0.6 0.13 200);
+
+  --sidebar: oklch(0.97 0.004 255);
+  --sidebar-foreground: oklch(0.3 0.015 255);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.925 0.012 255);
+  --sidebar-accent-foreground: oklch(0.2 0.015 255);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --shadow-xs-value: 0 1px 2px 0 oklch(0.2 0.02 255 / 6%);
+  --shadow-sm-value: 0 1px 3px 0 oklch(0.2 0.02 255 / 8%), 0 1px 2px -1px oklch(0.2 0.02 255 / 8%);
+  --shadow-md-value: 0 4px 10px -2px oklch(0.2 0.02 255 / 10%), 0 2px 4px -2px oklch(0.2 0.02 255 / 8%);
+  --shadow-lg-value: 0 12px 28px -6px oklch(0.2 0.02 255 / 16%), 0 4px 8px -4px oklch(0.2 0.02 255 / 10%);
+
+  color-scheme: light;
+}
+
+/* ---------- Qorong'i mavzu (asosiy) ---------- */
+.dark {
+  --background: oklch(0.165 0.008 260);
+  --foreground: oklch(0.94 0.004 255);
+  --card: oklch(0.205 0.009 260);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.225 0.01 260);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.65 0.17 256);
+  --primary-foreground: oklch(0.16 0.01 260);
+  --secondary: oklch(0.255 0.01 260);
+  --secondary-foreground: oklch(0.92 0.004 255);
+  --muted: oklch(0.245 0.01 260);
+  --muted-foreground: oklch(0.68 0.012 255);
+  --accent: oklch(0.27 0.014 260);
+  --accent-foreground: oklch(0.95 0.004 255);
+  --destructive: oklch(0.66 0.19 24);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.65 0.17 256 / 65%);
+
+  --success: oklch(0.72 0.16 150);
+  --success-foreground: oklch(0.16 0.03 150);
+  --success-muted: oklch(0.72 0.16 150 / 15%);
+  --warning: oklch(0.8 0.15 80);
+  --warning-foreground: oklch(0.2 0.04 80);
+  --warning-muted: oklch(0.8 0.15 80 / 15%);
+  --danger: oklch(0.67 0.2 24);
+  --danger-foreground: oklch(0.98 0 0);
+  --danger-muted: oklch(0.67 0.2 24 / 16%);
+  --neutral: oklch(0.62 0.01 255);
+  --neutral-muted: oklch(0.62 0.01 255 / 16%);
+  --info: oklch(0.68 0.16 256);
+  --info-foreground: oklch(0.16 0.01 260);
+  --info-muted: oklch(0.68 0.16 256 / 16%);
+
+  --overlay-roi: oklch(0.8 0.14 220);
+  --overlay-line: oklch(0.87 0.17 90);
+  --overlay-box: oklch(0.8 0.17 150);
+  --overlay-label-bg: oklch(0.12 0.01 255 / 80%);
+  --video-bg: oklch(0.12 0.006 260);
+
+  --chart-1: oklch(0.68 0.16 256);
+  --chart-2: oklch(0.72 0.16 150);
+  --chart-3: oklch(0.8 0.15 80);
+  --chart-4: oklch(0.7 0.18 330);
+  --chart-5: oklch(0.72 0.12 200);
+
+  --sidebar: oklch(0.185 0.009 260);
+  --sidebar-foreground: oklch(0.82 0.008 255);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.26 0.014 260);
+  --sidebar-accent-foreground: oklch(0.96 0.004 255);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: var(--ring);
+
+  --shadow-xs-value: 0 1px 2px 0 oklch(0 0 0 / 30%);
+  --shadow-sm-value: 0 1px 3px 0 oklch(0 0 0 / 35%), 0 1px 2px -1px oklch(0 0 0 / 30%);
+  --shadow-md-value: 0 4px 12px -2px oklch(0 0 0 / 40%), 0 2px 4px -2px oklch(0 0 0 / 30%);
+  --shadow-lg-value: 0 14px 32px -6px oklch(0 0 0 / 55%), 0 4px 8px -4px oklch(0 0 0 / 35%);
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  body {
+    @apply bg-background text-foreground text-base;
+  }
+  /* Klaviatura fokusi doim ko'rinadi */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  ::selection {
+    background: oklch(0.65 0.17 256 / 35%);
+  }
+}
+
+@layer utilities {
+  /* Sanoq o'zgarganda matn sakramaydi */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .transition-base {
+    transition-duration: var(--duration-normal);
+    transition-timing-function: var(--ease-standard);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

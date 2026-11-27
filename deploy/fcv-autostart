@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# F_CV avtomatik ishga tushish yordamchisi (root). deploy/install.sh uni /usr/local/sbin/ ga o'rnatadi
+# va servis foydalanuvchisiga parolsiz sudo ruxsatini beradi (faqat shu skript uchun).
+#   fcv-autostart services on|off    — kompyuter yonganda F_CV servislari (systemd fcv.target)
+#   fcv-autostart autologin on|off   — GDM avtomatik kirish (kiosk brauzer login'siz ochilishi uchun)
+# Foydalanuvchi o'rnatishda qotiriladi (@USER@) — argument sifatida qabul qilinmaydi.
+set -euo pipefail
+FCV_USER="@USER@"
+GDM_CONF="/etc/gdm3/custom.conf"
+UNITS=(fcv.target fcv-api.service fcv-video.service fcv-logic.service fcv-inference.service
+  fcv-trainer.service fcv-telegram.service fcv-backup.timer)
+
+[[ $EUID -eq 0 ]] || { echo "root huquqi kerak" >&2; exit 1; }
+what="${1:-}" state="${2:-}"
+[[ "$state" == on || "$state" == off ]] || { echo "Foydalanish: $0 services|autologin on|off" >&2; exit 2; }
+
+case "$what" in
+  services)
+    if [[ "$state" == on ]]; then
+      systemctl enable "${UNITS[@]}"
+    else
+      # faqat avtomatik ishga tushish o'chiriladi — ishlab turgan servislar to'xtatilmaydi
+      systemctl disable "${UNITS[@]}"
+    fi
+    ;;
+  autologin)
+    [[ -d /etc/gdm3 ]] || { echo "GDM topilmadi (/etc/gdm3)" >&2; exit 3; }
+    python3 -I - "$GDM_CONF" "$FCV_USER" "$state" <<'PY'
+import os, re, sys, tempfile
+
+path, user, state = sys.argv[1:]
+try:
+    lines = open(path, encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    lines = []
+want = {"AutomaticLoginEnable": "true" if state == "on" else "false"}
+if state == "on":
+    want["AutomaticLogin"] = user
+start = next((i for i, ln in enumerate(lines) if ln.strip().lower() == "[daemon]"), None)
+if start is None:
+    lines = ["[daemon]"] + [f"{k}={v}" for k, v in want.items()] + [""] + lines
+else:
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip().startswith("[")), len(lines))
+    done = set()
+    for i in range(start + 1, end):
+        m = re.match(r"\s*(\w+)\s*=", lines[i])  # izohlangan (#) qatorlar tegilmaydi
+        if m and m.group(1) in want:
+            lines[i] = f"{m.group(1)}={want[m.group(1)]}"
+            done.add(m.group(1))
+    lines[start + 1 : start + 1] = [f"{k}={v}" for k, v in want.items() if k not in done]
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".custom.conf.")
+with os.fdopen(fd, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+os.chmod(tmp, 0o644)
+os.replace(tmp, path)
+PY
+    ;;
+  *)
+    echo "Noma'lum: $what (services | autologin)" >&2; exit 2 ;;
+esac
+echo "ok: $what $state"

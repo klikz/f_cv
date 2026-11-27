@@ -1,0 +1,7 @@
+[Unit]
+Description=F_CV — barcha servislar
+Wants=fcv-api.service fcv-video.service fcv-logic.service fcv-inference.service fcv-trainer.service fcv-telegram.service
+After=network-online.target postgresql.service redis-server.service
+
+[Install]
+WantedBy=multi-user.target

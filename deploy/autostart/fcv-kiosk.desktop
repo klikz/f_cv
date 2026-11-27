@@ -1,0 +1,7 @@
+[Desktop Entry]
+# Namuna. Odatda UI dan yoqiladi: Umumiy sozlamalar → Avtomatik ishga tushish (fayl avtomatik yoziladi).
+# Kiosk rejim kerak bo'lmasa --kiosk ni olib tashlang.
+Type=Application
+Name=F_CV
+Exec=sh -c 'sleep 10; google-chrome --kiosk --noerrdialogs --disable-session-crashed-bubble --app=http://localhost:8100/'
+X-GNOME-Autostart-enabled=true

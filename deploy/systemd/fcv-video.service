@@ -1,0 +1,23 @@
+[Unit]
+Description=F_CV — video servis (dekod)
+PartOf=fcv.target
+After=network-online.target postgresql.service redis-server.service 
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@/backend
+EnvironmentFile=@ROOT@/.env
+ExecStart=@ROOT@/backend/.venv/bin/fcv video-service
+Restart=always
+WatchdogSec=30
+NotifyAccess=main
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+Nice=-5
+
+[Install]
+WantedBy=fcv.target

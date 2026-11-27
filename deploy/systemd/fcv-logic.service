@@ -1,0 +1,21 @@
+[Unit]
+Description=F_CV — kamera logikasi (har faol kamera uchun process boshqaruvchisi)
+PartOf=fcv.target
+After=network-online.target postgresql.service redis-server.service fcv-video.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@/backend
+EnvironmentFile=@ROOT@/.env
+ExecStart=@ROOT@/backend/.venv/bin/fcv camera-logic --supervisor
+Restart=always
+WatchdogSec=30
+NotifyAccess=main
+RestartSec=3
+TimeoutStopSec=30
+KillMode=mixed
+
+[Install]
+WantedBy=fcv.target

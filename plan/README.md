@@ -8,11 +8,11 @@ Bu papkada har bosqich uchun alohida fayl bor. Umumiy arxitektura va qarorlar �
 
 | | |
 |---|---|
-| **Joriy bosqich** | 0 — Infratuzilma va dizayn tizimi |
-| **Oxirgi bajarilgan qadam** | — |
-| **Keyingi qadam** | 0.1.1 |
-| **To'siq / ochiq muammo** | — |
-| **Oxirgi yangilanish** | — |
+| **Joriy bosqich** | Dasturiy qism tugagan — haqiqiy uskunada sinovlar qolgan |
+| **Oxirgi bajarilgan qadam** | 8.8 hujjatlar; jami 339 qadam bajarildi |
+| **Keyingi qadam** | 0.6.5 prototiplarni ko'rib chiqish; 1.2.9 ONVIF (login/parol); 6.6 Telegram (token); 4.9/5.7 haqiqiy liniya; 8.6–8.7 serverda |
+| **To'siq / ochiq muammo** | ONVIF profillari uchun haqiqiy kamera login/paroli kerak; Telegram bot tokeni kerak; BIOS/iGPU — serverda |
+| **Oxirgi yangilanish** | 2026-11-27 |
 
 ---
 
@@ -20,15 +20,15 @@ Bu papkada har bosqich uchun alohida fayl bor. Umumiy arxitektura va qarorlar �
 
 | # | Fayl | Bosqich | Holat | Bajarildi |
 |---|---|---|---|---|
-| 0 | [00-infratuzilma.md](00-infratuzilma.md) | Infratuzilma va dizayn tizimi | ⬜ | 0 / 52 |
-| 1 | [01-kameralar-video.md](01-kameralar-video.md) | Kameralar va video | ⬜ | 0 / 52 |
-| 2 | [02-vazifalar-chizish.md](02-vazifalar-chizish.md) | Vazifalar karkasi va chizish | ⬜ | 0 / 36 |
-| 3 | [03-dataset-train.md](03-dataset-train.md) | Katalog, dataset, belgilash, train | ⬜ | 0 / 52 |
-| 4 | [04-sanash.md](04-sanash.md) | Mahsulot sanash | ⬜ | 0 / 48 |
-| 5 | [05-uskuna.md](05-uskuna.md) | Uskuna ish vaqti va sikllar | ⬜ | 0 / 43 |
-| 6 | [06-telegram.md](06-telegram.md) | Telegram (asos) | ⬜ | 0 / 31 |
-| 7 | [07-smenalar-hisobotlar.md](07-smenalar-hisobotlar.md) | Smenalar va hisobotlar (asos) | ⬜ | 0 / 20 |
-| 8 | [08-barqarorlik.md](08-barqarorlik.md) | Barqarorlik va ishga topshirish | ⬜ | 0 / 35 |
+| 0 | [00-infratuzilma.md](00-infratuzilma.md) | Infratuzilma va dizayn tizimi | 🟡 | 46 / 52 |
+| 1 | [01-kameralar-video.md](01-kameralar-video.md) | Kameralar va video | 🟡 | 51 / 52 |
+| 2 | [02-vazifalar-chizish.md](02-vazifalar-chizish.md) | Vazifalar karkasi va chizish | ✅ | 36 / 36 |
+| 3 | [03-dataset-train.md](03-dataset-train.md) | Katalog, dataset, belgilash, train | ✅ | 52 / 52 |
+| 4 | [04-sanash.md](04-sanash.md) | Mahsulot sanash | 🟡 | 42 / 48 |
+| 5 | [05-uskuna.md](05-uskuna.md) | Uskuna ish vaqti va sikllar | 🟡 | 40 / 43 |
+| 6 | [06-telegram.md](06-telegram.md) | Telegram (asos) | 🟡 | 27 / 31 |
+| 7 | [07-smenalar-hisobotlar.md](07-smenalar-hisobotlar.md) | Smenalar va hisobotlar (asos) | ✅ | 20 / 20 |
+| 8 | [08-barqarorlik.md](08-barqarorlik.md) | Barqarorlik va ishga topshirish | 🟡 | 25 / 35 |
 
 "Bajarildi" ustunida faqat raqamlangan qadamlar sanaladi (jami 369 ta); qabul mezonlari alohida belgilanadi.
 

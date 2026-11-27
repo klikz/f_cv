@@ -1,0 +1,23 @@
+[Unit]
+Description=F_CV — trainer
+PartOf=fcv.target
+After=network-online.target postgresql.service redis-server.service fcv-inference.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@/backend
+EnvironmentFile=@ROOT@/.env
+ExecStart=@ROOT@/backend/.venv/bin/fcv trainer
+Restart=always
+WatchdogSec=30
+NotifyAccess=main
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+Nice=10
+
+[Install]
+WantedBy=fcv.target

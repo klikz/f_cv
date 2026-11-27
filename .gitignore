@@ -1,0 +1,25 @@
+# Ma'lumotlar va maxfiy sozlamalar
+data/
+.env
+*.engine
+*.pt
+*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Muhit
+.idea/
+.vscode/
+*.log
+graphify-out/

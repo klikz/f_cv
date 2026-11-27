@@ -1,0 +1,12 @@
+[Unit]
+Description=F_CV — DB migratsiyalari (har ishga tushishda)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@ROOT@/backend
+EnvironmentFile=@ROOT@/.env
+ExecStart=@ROOT@/backend/.venv/bin/alembic upgrade head
+RemainAfterExit=yes
