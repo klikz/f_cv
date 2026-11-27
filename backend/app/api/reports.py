@@ -17,6 +17,7 @@ from app.models.counting import CountEvent
 from app.models.equipment import CycleEvent, EquipmentInterval
 from app.models.shifts import Shift
 from app.models.tasks import CountingConfig
+from app.services.shift_summary import count_sign
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -71,13 +72,9 @@ async def counts_report(
     by_cam: dict[int | None, int] = defaultdict(int)
     total = uncertain = corrected = 0
     for e in rows:
-        cfg = cfgs.get(e.camera_id or 0)
-        sign = 1
-        if e.direction == "reverse":
-            if cfg and cfg.direction != "both" and cfg.reverse_policy == "subtract":
-                sign = -1
-            elif cfg and cfg.direction != "both":
-                continue  # "alohida" — asosiy hisobga kirmaydi
+        sign = count_sign(e.direction, cfgs.get(e.camera_id or 0))
+        if not sign:
+            continue  # "alohida" — asosiy hisobga kirmaydi
         total += sign
         uncertain += int(e.status == "uncertain")
         corrected += int(e.status == "corrected")

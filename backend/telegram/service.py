@@ -23,10 +23,14 @@ from app.models.cameras import Camera
 from app.models.counting import CountEvent
 from app.models.telegram import NotificationOutbox, TelegramChat, TelegramSubscription
 from app.services.settings_store import get_setting
+from app.services.shift_summary import camera_shift_summary
+from app.services.shifts import ShiftResolver, shift_bounds
 from telegram.registry import REGISTRY, types_for_event
 
 log = logging.getLogger(__name__)
 GROUP = "telegram"
+SHIFT_REPORT_STATE = keys.P + "telegram:shift_report"  # hash: "{chat}:{camera}" -> json holat
+FINAL_GRACE_SEC = 6 * 3600  # servis shuncha vaqt ichida qaytsa, o'tgan smena yakuniy hisoboti baribir yuboriladi
 CONSUMER = "tg-1"
 
 
@@ -44,6 +48,7 @@ class TelegramService:
         self.username: str | None = None
         self.last_sent: dict[int, float] = {}
         self.pending_stops: dict[int, dict] = {}  # camera_id -> {since, notified}
+        self.shifts = ShiftResolver()
 
     # ---------- holat ----------
     async def set_status(self, state: str, error: str | None = None) -> None:
@@ -307,6 +312,100 @@ class TelegramService:
             await s.commit()
         return n
 
+    # ---------- smena hisoboti (jadval bo'yicha) ----------
+    async def shift_report_loop(self, stop: asyncio.Event) -> None:
+        while not stop.is_set():
+            try:
+                await self.shift_report_tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("smena hisoboti")
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stop.wait(), 20)
+
+    async def shift_report_tick(self) -> None:
+        """Har obuna (chat × kamera) uchun: smena boshidan har N daqiqada oraliq hisobot, smena tugaganda yakuniy.
+
+        Holat Redis'da saqlanadi — servis qayta ishga tushsa takror yubormaydi.
+        """
+        now_dt = now()
+        now_ts = now_dt.timestamp()
+        async with get_sessionmaker()() as s:
+            subs = (
+                await s.execute(
+                    select(TelegramSubscription, TelegramChat)
+                    .join(TelegramChat, TelegramChat.id == TelegramSubscription.chat_id)
+                    .where(TelegramSubscription.message_type == "shift_report", TelegramChat.active.is_(True))
+                )
+            ).all()
+            state = await self.r.hgetall(SHIFT_REPORT_STATE)
+            alive = {f"{sub.chat_id}:{sub.camera_id}" for sub, _ in subs}
+            stale = [k for k in state if k not in alive]
+            if stale:
+                await self.r.hdel(SHIFT_REPORT_STATE, *stale)
+            if not subs:
+                return
+            cur = None
+            match = await self.shifts.resolve(s, now_dt)
+            sdef = self.shifts.get(match.shift_id) if match else None
+            if match and sdef:
+                a, b = shift_bounds(sdef, match.shift_date)
+                cur = {
+                    "key": f"{match.shift_date.isoformat()}:{match.shift_id}",
+                    "shift_id": match.shift_id,
+                    "date": match.shift_date.isoformat(),
+                    "name": match.shift_name,
+                    "start": a.timestamp(),
+                    "end": b.timestamp(),
+                }
+
+            for sub, chat in subs:
+                k = f"{sub.chat_id}:{sub.camera_id}"
+                interval = max(5.0, float((sub.params or {}).get("minutes", 60))) * 60
+                st = json.loads(state[k]) if k in state else None
+                if st and (cur is None or st["key"] != cur["key"]):
+                    if st["end"] <= now_ts < st["end"] + FINAL_GRACE_SEC:
+                        await self._send_shift_report(s, sub, chat, st, st["end"], final=True, interval=interval)
+                    st = None
+                if cur is None:
+                    await self.r.hdel(SHIFT_REPORT_STATE, k)
+                    continue
+                slot = int((now_ts - cur["start"]) // interval)
+                if st is None or st.get("interval") != interval:
+                    st = {**cur, "slot": slot, "interval": interval}  # yangi smena/obuna — keyingi slotdan boshlab
+                elif slot > st["slot"]:
+                    await self._send_shift_report(s, sub, chat, st, now_ts, final=False, interval=interval)
+                    st["slot"] = slot
+                await self.r.hset(SHIFT_REPORT_STATE, k, json.dumps(st))
+
+    async def _send_shift_report(self, s, sub, chat, st: dict, till: float, final: bool, interval: float) -> None:
+        start = datetime.fromtimestamp(st["start"], UTC)
+        end = datetime.fromtimestamp(till, UTC)
+        summary = await camera_shift_summary(
+            s,
+            sub.camera_id,
+            st["shift_id"],
+            datetime.fromisoformat(st["date"]).date(),
+            start,
+            end,
+            recent_from=None if final else end - timedelta(seconds=interval),
+        )
+        d = st["date"]
+        ev = {
+            "kind": "shift_report",
+            "camera_id": sub.camera_id,
+            "shift": st["name"],
+            "shift_date": f"{d[8:10]}.{d[5:7]}",
+            "start": st["start"],
+            "end": till,
+            "ts": time.time(),
+            "final": final,
+            "interval_min": int(interval // 60),
+            "summary": summary,
+        }
+        await self.enqueue(ev, [REGISTRY["shift_report"]], only_chats={chat.id})
+
     # ---------- yuboruvchi ----------
     async def sender_loop(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
@@ -424,6 +523,7 @@ class TelegramService:
             asyncio.create_task(self.polling_loop(stop)),
             asyncio.create_task(self.events_loop(stop)),
             asyncio.create_task(self.sender_loop(stop)),
+            asyncio.create_task(self.shift_report_loop(stop)),
         ]
         await stop.wait()
         for t in tasks:

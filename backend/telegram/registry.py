@@ -28,12 +28,13 @@ def _dur(sec: float) -> str:
 class MessageType:
     code: str
     title: str
-    task: str  # counting | equipment | system
+    task: str  # counting | equipment | system | report
     events: tuple[str, ...]
     render: Callable[[dict, dict], str]
     params: dict[str, Any] = field(default_factory=dict)  # standart parametrlar
     per_camera: bool = True
     with_image: bool = False
+    param_labels: dict[str, str] = field(default_factory=dict)  # UI uchun: {"minutes": "har N daqiqada"}
 
 
 def r_count(e: dict, ctx: dict) -> str:
@@ -74,6 +75,45 @@ def r_train_failed(e: dict, ctx: dict) -> str:
     return f"❌ <b>Train xato bilan tugadi</b>: {e.get('product', '—')}\n{(e.get('error') or '')[:300]}"
 
 
+def r_shift_report(e: dict, ctx: dict) -> str:
+    """e: {shift, shift_date, start, end, final, interval_min, summary} (start/end — unix ts)."""
+    sm = e["summary"]
+    head = "🏁 <b>Smena yakuni</b>" if e.get("final") else "📊 <b>Smena hisoboti</b>"
+    till = _t(e["end"])[:5] + ("" if e.get("final") else " (hozir)")
+    lines = [
+        f"{head} — {e.get('shift', '—')} ({e.get('shift_date', '')})",
+        f"Kamera: {ctx.get('camera', '—')}",
+        f"Vaqt: {_t(e['start'])[:5]} – {till}",
+    ]
+    c = sm.get("counting")
+    if c is not None:
+        rec = f" (oxirgi {e['interval_min']} daq: {c['recent']})" if c.get("recent") is not None else ""
+        lines += ["", f"📦 Sanaldi: <b>{c['total']}</b> ta{rec}"]
+        lines += [f"  • {p['name']} — {p['count']}" for p in c["by_product"][:10]]
+        if len(c["by_product"]) > 10:
+            lines.append(f"  • boshqalar — {sum(p['count'] for p in c['by_product'][10:])}")
+        if c["uncertain"]:
+            lines.append(f"  ⚠️ Noaniq: {c['uncertain']}")
+    q = sm.get("equipment")
+    if q is not None:
+        util = f" ({q['utilization_pct']}%)" if q["utilization_pct"] is not None else ""
+        lines += [
+            "",
+            f"⚙️ Ishladi: <b>{_dur(q['running'])}</b>{util}",
+            f"  To'xtadi: {_dur(q['stopped'])} ({q['stops']} marta)",
+        ]
+        if q["unknown"] >= 60:
+            lines.append(f"  Noma'lum: {_dur(q['unknown'])}")
+        if q["cycles"]:
+            avg = f", o'rtacha {q['avg_cycle_sec']} s" if q["avg_cycle_sec"] is not None else ""
+            lines.append(f"  Sikllar: {q['cycles']}{avg}; mikro-to'xtash: {q['micro_stops']}")
+    if c is None and q is None:
+        lines += ["", "Bu kamerada sanoq yoki uskuna vazifasi yoqilmagan."]
+    if sm.get("gap_sec", 0) >= 60:
+        lines += ["", f"📵 Sanalmagan vaqt: {_dur(sm['gap_sec'])}"]
+    return "\n".join(lines)
+
+
 def r_test(e: dict, ctx: dict) -> str:
     return "🔔 F_CV: sinov xabari. Bot ishlayapti."
 
@@ -91,6 +131,15 @@ REGISTRY: dict[str, MessageType] = {
             {"minutes": 5},
         ),
         MessageType("equipment_started", "Uskuna qayta ishga tushdi", "equipment", ("equipment_state",), r_eq_started),
+        MessageType(
+            "shift_report",
+            "Smena hisoboti",
+            "report",
+            (),  # hodisadan emas — telegram-service jadval bo'yicha yuboradi
+            r_shift_report,
+            {"minutes": 60},
+            param_labels={"minutes": "daqiqada bir (smena oxirida — yakuniy)"},
+        ),
         MessageType("camera_offline", "Kamera uzildi", "system", ("camera_offline",), r_cam_off),
         MessageType("camera_online", "Kamera tiklandi", "system", ("camera_online",), r_cam_on),
         MessageType("train_done", "Train tugadi", "system", ("train_done",), r_train_done, per_camera=False),
@@ -116,6 +165,13 @@ def types_for_event(kind: str, event: dict) -> list[MessageType]:
 
 def describe() -> list[dict]:
     return [
-        {"code": t.code, "title": t.title, "task": t.task, "params": t.params, "per_camera": t.per_camera}
+        {
+            "code": t.code,
+            "title": t.title,
+            "task": t.task,
+            "params": t.params,
+            "param_labels": t.param_labels,
+            "per_camera": t.per_camera,
+        }
         for t in REGISTRY.values()
     ]

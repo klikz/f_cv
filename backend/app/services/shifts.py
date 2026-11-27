@@ -75,6 +75,16 @@ def match_shift(shifts: Sequence[ShiftDef], ts: datetime, tz: ZoneInfo | None = 
     return None
 
 
+def shift_bounds(s: ShiftDef, shift_date: date, tz: ZoneInfo | None = None) -> tuple[datetime, datetime]:
+    """Smena sanasi bo'yicha aniq boshlanish/tugash (aware). Yarim tundan o'tsa tugash ertangi kunda."""
+    tz = tz or _tz()
+    start = datetime.combine(shift_date, s.start_time, tz)
+    end = datetime.combine(shift_date, s.end_time, tz)
+    if end <= start:
+        end += timedelta(days=1)
+    return start, end
+
+
 class ShiftResolver:
     """DB dagi smenalarni keshlab, hodisa vaqtida smenani aniqlaydi."""
 
@@ -89,6 +99,9 @@ class ShiftResolver:
         rows = (await session.execute(select(Shift).order_by(Shift.effective_from, Shift.position))).scalars()
         self._shifts = [ShiftDef(r.id, r.name, r.start_time, r.end_time, r.effective_from) for r in rows]
         self._loaded_at = datetime.now().astimezone()
+
+    def get(self, shift_id: int) -> ShiftDef | None:
+        return next((s for s in self._shifts if s.id == shift_id), None)
 
     def invalidate(self) -> None:
         self._loaded_at = None

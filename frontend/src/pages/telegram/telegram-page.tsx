@@ -17,13 +17,13 @@ import { fmtDateTime } from '@/lib/format'
 import { notify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 
-type MsgType = { code: string; title: string; task: 'counting' | 'equipment' | 'system'; params: Record<string, number>; per_camera: boolean }
+type MsgType = { code: string; title: string; task: 'counting' | 'equipment' | 'system' | 'report'; params: Record<string, number>; param_labels?: Record<string, string>; per_camera: boolean }
 type Status = { state: string; label: string; error: string | null; username: string | null; has_token: boolean; outbox: Record<string, number>; types: MsgType[] }
 type Chat = { id: number; chat_id: number; title: string; type: string; active: boolean; subscriptions: number; created_at: string }
 type Sub = { camera_id: number | null; message_type: string; params: Record<string, number> }
 
 const STATE_KIND: Record<string, StatusKind> = { connected: 'online', no_internet: 'offline', bad_token: 'error', no_token: 'disabled', starting: 'connecting' }
-const TASK_LABEL = { counting: 'Mahsulot sanash', equipment: 'Uskuna ish vaqti', system: 'Tizim' }
+const TASK_LABEL = { counting: 'Mahsulot sanash', equipment: 'Uskuna ish vaqti', system: 'Tizim', report: 'Hisobot' }
 
 function TokenCard({ status }: { status: Status }) {
   const [token, setToken] = useState('')
@@ -125,8 +125,8 @@ function Matrix({ chat, types }: { chat: Chat; types: MsgType[] }) {
             Object.entries(t.params).map(([k, dv]) => (
               <label key={`${t.code}-${k}`} className="flex items-center gap-2 text-sm">
                 "{t.title}" — N =
-                <Input type="number" min={1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
-                daqiqa
+                <Input type="number" min={t.code === 'shift_report' ? 5 : 1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
+                {t.param_labels?.[k] ?? 'daqiqa'}
               </label>
             )),
           )}
