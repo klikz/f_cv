@@ -30,12 +30,33 @@ from telegram.registry import REGISTRY, types_for_event
 log = logging.getLogger(__name__)
 GROUP = "telegram"
 SHIFT_REPORT_STATE = keys.P + "telegram:shift_report"  # hash: "{chat}:{camera}" -> json holat
+SHIFT_REPORT_FINAL = keys.P + "telegram:shift_report_final"  # hash: "{chat}:{camera}" -> oxirgi yakuniy smena kaliti
 FINAL_GRACE_SEC = 6 * 3600  # servis shuncha vaqt ichida qaytsa, o'tgan smena yakuniy hisoboti baribir yuboriladi
 CONSUMER = "tg-1"
 
 
 def now() -> datetime:
     return datetime.now(UTC)
+
+
+def report_params(params: dict | None) -> tuple[float, float]:
+    """Smena hisoboti obunasi parametrlari → (oraliq, yakuniy kechikish) soniyada."""
+    p = params or {}
+    d = REGISTRY["shift_report"].params
+    interval = max(5.0, float(p.get("minutes") or d["minutes"])) * 60
+    delay = min(720.0, max(0.0, float(p.get("delay", d["delay"])))) * 60
+    return interval, delay
+
+
+def _shift_info(sdef, shift_date, a: datetime, b: datetime) -> dict:
+    return {
+        "key": f"{shift_date.isoformat()}:{sdef.id}",
+        "shift_id": sdef.id,
+        "date": shift_date.isoformat(),
+        "name": sdef.name,
+        "start": a.timestamp(),
+        "end": b.timestamp(),
+    }
 
 
 class TelegramService:
@@ -325,9 +346,12 @@ class TelegramService:
                 await asyncio.wait_for(stop.wait(), 20)
 
     async def shift_report_tick(self) -> None:
-        """Har obuna (chat × kamera) uchun: smena boshidan har N daqiqada oraliq hisobot, smena tugaganda yakuniy.
+        """Har obuna (chat × kamera) uchun: smena boshidan har N daqiqada oraliq hisobot,
+        smena tugagach `delay` daqiqadan keyin — yakuniy.
 
-        Holat Redis'da saqlanadi — servis qayta ishga tushsa takror yubormaydi.
+        Yakuniy hisobot "oxirgi tugagan smena" bo'yicha aniqlanadi (smena almashuvini kuzatib turish shart emas):
+        servis o'sha paytda ishlamagan bo'lsa ham, qaytgach FINAL_GRACE_SEC ichida yuboriladi.
+        Holat Redis'da — servis qayta ishga tushsa takror yubormaydi.
         """
         now_dt = now()
         now_ts = now_dt.timestamp()
@@ -340,51 +364,111 @@ class TelegramService:
                 )
             ).all()
             state = await self.r.hgetall(SHIFT_REPORT_STATE)
+            finals = await self.r.hgetall(SHIFT_REPORT_FINAL)
             alive = {f"{sub.chat_id}:{sub.camera_id}" for sub, _ in subs}
-            stale = [k for k in state if k not in alive]
-            if stale:
-                await self.r.hdel(SHIFT_REPORT_STATE, *stale)
+            for h, d in ((SHIFT_REPORT_STATE, state), (SHIFT_REPORT_FINAL, finals)):
+                stale = [k for k in d if k not in alive]
+                if stale:
+                    await self.r.hdel(h, *stale)
             if not subs:
                 return
-            cur = None
-            match = await self.shifts.resolve(s, now_dt)
-            sdef = self.shifts.get(match.shift_id) if match else None
-            if match and sdef:
-                a, b = shift_bounds(sdef, match.shift_date)
-                cur = {
-                    "key": f"{match.shift_date.isoformat()}:{match.shift_id}",
-                    "shift_id": match.shift_id,
-                    "date": match.shift_date.isoformat(),
-                    "name": match.shift_name,
-                    "start": a.timestamp(),
-                    "end": b.timestamp(),
-                }
+            cur = await self._current_shift(s, now_dt)
 
             for sub, chat in subs:
                 k = f"{sub.chat_id}:{sub.camera_id}"
-                interval = max(5.0, float((sub.params or {}).get("minutes", 60))) * 60
-                st = json.loads(state[k]) if k in state else None
-                if st and (cur is None or st["key"] != cur["key"]):
-                    if st["end"] <= now_ts < st["end"] + FINAL_GRACE_SEC:
-                        await self._send_shift_report(s, sub, chat, st, st["end"], final=True, interval=interval)
-                    st = None
+                interval, delay = report_params(sub.params)
+
+                # --- yakuniy: smena tugaganidan `delay` o'tgach ---
+                last = await self.shifts.last_ended(s, now_dt - timedelta(seconds=delay))
+                fin = _shift_info(*last) if last else None
+                fkey = fin["key"] if fin else ""
+                if k not in finals:
+                    # yangi obuna — oldin tugagan smenalar uchun yubormaymiz, keyingisidan boshlab
+                    await self.r.hset(SHIFT_REPORT_FINAL, k, fkey)
+                elif fin and finals[k] != fkey:
+                    if now_ts < fin["end"] + delay + FINAL_GRACE_SEC:
+                        await self._send_shift_report(s, sub, chat, fin, fin["end"], final=True, interval=interval)
+                    else:
+                        log.warning("Smena hisoboti %s (%s) kechikdi — yuborilmadi", fkey, k)
+                    await self.r.hset(SHIFT_REPORT_FINAL, k, fkey)
+
+                # --- oraliq: smena davomida har N daqiqada ---
                 if cur is None:
                     await self.r.hdel(SHIFT_REPORT_STATE, k)
                     continue
+                st = json.loads(state[k]) if k in state else None
                 slot = int((now_ts - cur["start"]) // interval)
-                if st is None or st.get("interval") != interval:
+                if st is None or st.get("key") != cur["key"] or st.get("interval") != interval:
                     st = {**cur, "slot": slot, "interval": interval}  # yangi smena/obuna — keyingi slotdan boshlab
                 elif slot > st["slot"]:
                     await self._send_shift_report(s, sub, chat, st, now_ts, final=False, interval=interval)
                     st["slot"] = slot
                 await self.r.hset(SHIFT_REPORT_STATE, k, json.dumps(st))
 
-    async def _send_shift_report(self, s, sub, chat, st: dict, till: float, final: bool, interval: float) -> None:
+    async def _current_shift(self, s, now_dt: datetime) -> dict | None:
+        match = await self.shifts.resolve(s, now_dt)
+        sdef = self.shifts.get(match.shift_id) if match else None
+        if not (match and sdef):
+            return None
+        a, b = shift_bounds(sdef, match.shift_date)
+        return _shift_info(sdef, match.shift_date, a, b)
+
+    async def send_shift_report_now(self, chat_id: int, camera_id: int) -> int:
+        """ "Darhol" tugmasi: joriy smena (smena boshidan hozirgacha) bo'yicha hisobot, obunadan qat'i nazar.
+
+        Smenadan tashqari vaqtda — oxirgi tugagan smenaning yakuniy hisoboti. Navbatga qo'yilgan xabar id sini qaytaradi.
+        """
+        now_dt = now()
+        async with get_sessionmaker()() as s:
+            chat = await s.get(TelegramChat, chat_id)
+            if chat is None:
+                raise LookupError("Chat topilmadi")
+            if not chat.active:
+                raise PermissionError("Chat faol emas (bot chatdan chiqarilgan)")
+            cam = await s.get(Camera, camera_id)
+            if cam is None:
+                raise LookupError("Kamera topilmadi")
+            sub = (
+                await s.execute(
+                    select(TelegramSubscription).where(
+                        TelegramSubscription.chat_id == chat_id,
+                        TelegramSubscription.camera_id == camera_id,
+                        TelegramSubscription.message_type == "shift_report",
+                    )
+                )
+            ).scalar_one_or_none()
+            interval, _ = report_params(sub.params if sub else None)
+            info = await self._current_shift(s, now_dt)
+            if info is not None:
+                till, final = now_dt.timestamp(), False
+            else:
+                last = await self.shifts.last_ended(s, now_dt)
+                if last is None:
+                    raise LookupError("Smenalar sozlanmagan")
+                info = _shift_info(*last)
+                till, final = info["end"], True
+            ev = await self._shift_report_event(s, camera_id, info, till, final, interval)
+            t = REGISTRY["shift_report"]
+            ttl_h = float(await get_setting(s, "telegram.outbox_ttl_hours") or 24)
+            m = NotificationOutbox(
+                chat_id=chat.id,
+                message_type=t.code,
+                text=t.render(ev, {"camera": cam.name, "params": (sub.params if sub else None) or {}}),
+                status="pending",
+                expires_at=now() + timedelta(hours=ttl_h),
+            )
+            s.add(m)
+            await s.flush()
+            mid = m.id
+            await s.commit()
+            return mid
+
+    async def _shift_report_event(self, s, camera_id: int, st: dict, till: float, final: bool, interval: float) -> dict:
         start = datetime.fromtimestamp(st["start"], UTC)
         end = datetime.fromtimestamp(till, UTC)
         summary = await camera_shift_summary(
             s,
-            sub.camera_id,
+            camera_id,
             st["shift_id"],
             datetime.fromisoformat(st["date"]).date(),
             start,
@@ -392,9 +476,9 @@ class TelegramService:
             recent_from=None if final else end - timedelta(seconds=interval),
         )
         d = st["date"]
-        ev = {
+        return {
             "kind": "shift_report",
-            "camera_id": sub.camera_id,
+            "camera_id": camera_id,
             "shift": st["name"],
             "shift_date": f"{d[8:10]}.{d[5:7]}",
             "start": st["start"],
@@ -404,7 +488,18 @@ class TelegramService:
             "interval_min": int(interval // 60),
             "summary": summary,
         }
-        await self.enqueue(ev, [REGISTRY["shift_report"]], only_chats={chat.id})
+
+    async def _send_shift_report(self, s, sub, chat, st: dict, till: float, final: bool, interval: float) -> None:
+        ev = await self._shift_report_event(s, sub.camera_id, st, till, final, interval)
+        n = await self.enqueue(ev, [REGISTRY["shift_report"]], only_chats={chat.id})
+        log.info(
+            "Smena hisoboti (%s, %s) chat=%s kamera=%s: %d ta navbatga",
+            st["key"],
+            "yakuniy" if final else "oraliq",
+            chat.id,
+            sub.camera_id,
+            n,
+        )
 
     # ---------- yuboruvchi ----------
     async def sender_loop(self, stop: asyncio.Event) -> None:

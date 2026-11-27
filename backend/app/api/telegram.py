@@ -155,6 +155,20 @@ async def send_test(chat_id: int, session: SessionDep) -> dict:
     return {"queued": m.id}
 
 
+@router.post("/chats/{chat_id}/shift-report/{camera_id}")
+async def send_shift_report_now(chat_id: int, camera_id: int, redis: RedisDep) -> dict:
+    """ "Darhol": joriy holat bo'yicha smena hisobotini shu chatga navbatga qo'yish."""
+    from telegram.service import TelegramService
+
+    try:
+        mid = await TelegramService(redis).send_shift_report_now(chat_id, camera_id)
+    except LookupError as e:
+        raise not_found(str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(409, str(e)) from e
+    return {"queued": mid}
+
+
 @router.get("/outbox")
 async def outbox(session: SessionDep, limit: int = 50) -> list[dict]:
     names = dict((await session.execute(select(TelegramChat.id, TelegramChat.title))).all())

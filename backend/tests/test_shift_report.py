@@ -103,12 +103,66 @@ async def test_shift_report_schedule(db, redis, monkeypatch):
     await s.shift_report_tick()  # shu slotda takror yo'q
     assert len(await outbox()) == 1
 
-    clock["t"] = local(27, 19, 0, 30)  # smena tugadi → yakuniy
+    clock["t"] = local(27, 19, 0, 30)  # smena tugadi — yakuniy hali emas (30 daq kechikish)
+    await s.shift_report_tick()
+    assert len(await outbox()) == 1
+
+    clock["t"] = local(27, 19, 30, 10)  # tugaganiga 30 daq → yakuniy
     await s.shift_report_tick()
     rows = await outbox()
     assert len(rows) == 2
     assert "Smena yakuni" in rows[1].text and "08:00 – 19:00" in rows[1].text
 
-    clock["t"] = local(27, 19, 1)
+    clock["t"] = local(27, 19, 31)
     await s.shift_report_tick()
     assert len(await outbox()) == 2
+
+
+async def test_shift_report_final_after_downtime(db, redis, monkeypatch):
+    """Servis smena almashuvi paytida ishlamagan bo'lsa ham, qaytgach yakuniy hisobot yuboriladi."""
+    import telegram.service as svc
+
+    await _setup(db)
+    sub = (await db.execute(select(TelegramSubscription))).scalars().one()
+    sub.params = {"minutes": 60, "delay": 10}
+    await db.commit()
+    clock = {"t": local(27, 18, 0)}
+    monkeypatch.setattr(svc, "now", lambda: clock["t"].astimezone(UTC))
+    await svc.TelegramService(redis).shift_report_tick()
+
+    clock["t"] = local(27, 21, 0)  # yangi jarayon, oradagi tiklar yo'q
+    await svc.TelegramService(redis).shift_report_tick()
+    db.expire_all()
+    rows = (await db.execute(select(NotificationOutbox))).scalars().all()
+    assert len(rows) == 1 and "Smena yakuni" in rows[0].text
+
+
+async def test_shift_report_now(db, redis, monkeypatch):
+    import telegram.service as svc
+
+    await _setup(db)
+    chat_id = (await db.execute(select(TelegramChat.id))).scalar_one()
+    cam_id = (await db.execute(select(Camera.id))).scalar_one()
+    monkeypatch.setattr(svc, "now", lambda: local(27, 10, 0).astimezone(UTC))
+    mid = await svc.TelegramService(redis).send_shift_report_now(chat_id, cam_id)
+    db.expire_all()
+    m = await db.get(NotificationOutbox, mid)
+    assert "Smena hisoboti" in m.text and "(hozir)" in m.text and "Sanaldi: <b>3</b>" in m.text
+
+    monkeypatch.setattr(svc, "now", lambda: local(27, 19, 5).astimezone(UTC))  # tungi smena boshida
+    mid = await svc.TelegramService(redis).send_shift_report_now(chat_id, cam_id)
+    db.expire_all()
+    assert "Tungi smena" in (await db.get(NotificationOutbox, mid)).text
+
+
+def test_last_ended_shift():
+    from app.services.shifts import last_ended_shift
+
+    day = ShiftDef(1, "Kunduzgi", time(8, 0), time(19, 0), EPOCH)
+    night = ShiftDef(2, "Tungi", time(19, 0), time(8, 0), EPOCH)
+    s, d, _, b = last_ended_shift([day, night], local(27, 19, 0), TZ)
+    assert s.id == 1 and d == date(2026, 11, 27) and b == local(27, 19, 0)
+    s, d, _, b = last_ended_shift([day, night], local(27, 7, 0), TZ)  # tungi smena hali davom etmoqda
+    assert s.id == 1 and d == date(2026, 11, 26) and b == local(26, 19, 0)
+    s, d, _, b = last_ended_shift([day, night], local(27, 8, 0), TZ)
+    assert s.id == 2 and d == date(2026, 11, 26) and b == local(27, 8, 0)

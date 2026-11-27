@@ -81,6 +81,19 @@ function Matrix({ chat, types }: { chat: Chat; types: MsgType[] }) {
       notify.error("Saqlab bo'lmadi", e)
     }
   }
+  const [sending, setSending] = useState<number | null>(null)
+  const sendNow = async (cam: number, name: string) => {
+    setSending(cam)
+    try {
+      await api.post(`/telegram/chats/${chat.id}/shift-report/${cam}`)
+      notify.success("Smena hisoboti navbatga qo'yildi", name)
+      void qc.invalidateQueries({ queryKey: ['tg-outbox'] })
+    } catch (e) {
+      notify.error("Yuborib bo'lmadi", e)
+    } finally {
+      setSending(null)
+    }
+  }
   const camTypes = types.filter((t) => t.per_camera)
   const sysTypes = types.filter((t) => !t.per_camera)
 
@@ -105,7 +118,14 @@ function Matrix({ chat, types }: { chat: Chat; types: MsgType[] }) {
                 <TableCell className="font-medium">{c.name}</TableCell>
                 {camTypes.map((t) => (
                   <TableCell key={t.code} className="text-center">
-                    <Checkbox checked={has(c.id, t.code)} onCheckedChange={(v) => toggle(c.id, t.code, v === true, t.params)} aria-label={`${c.name}: ${t.title}`} />
+                    <div className="inline-flex items-center gap-2">
+                      <Checkbox checked={has(c.id, t.code)} onCheckedChange={(v) => toggle(c.id, t.code, v === true, t.params)} aria-label={`${c.name}: ${t.title}`} />
+                      {t.code === 'shift_report' && (
+                        <Button size="xs" variant="outline" disabled={sending === c.id} onClick={() => void sendNow(c.id, c.name)} title="Joriy holat bo'yicha smena hisobotini hozir yuborish">
+                          {sending === c.id ? <Loader2 className="animate-spin" /> : <Send />} Darhol
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 ))}
               </TableRow>
@@ -125,7 +145,7 @@ function Matrix({ chat, types }: { chat: Chat; types: MsgType[] }) {
             Object.entries(t.params).map(([k, dv]) => (
               <label key={`${t.code}-${k}`} className="flex items-center gap-2 text-sm">
                 "{t.title}" — N =
-                <Input type="number" min={t.code === 'shift_report' ? 5 : 1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
+                <Input type="number" min={t.code === 'shift_report' ? (k === 'delay' ? 0 : 5) : 1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
                 {t.param_labels?.[k] ?? 'daqiqa'}
               </label>
             )),

@@ -85,6 +85,27 @@ def shift_bounds(s: ShiftDef, shift_date: date, tz: ZoneInfo | None = None) -> t
     return start, end
 
 
+def last_ended_shift(
+    shifts: Sequence[ShiftDef], ts: datetime, tz: ZoneInfo | None = None
+) -> tuple[ShiftDef, date, datetime, datetime] | None:
+    """`ts` gacha (shu jumladan) tugagan eng oxirgi smena: (smena, smena sanasi, boshlanish, tugash).
+
+    Smena o'z boshlanish paytida amalda bo'lgan to'plamdan olinadi. 3 kun orqaga qaraladi.
+    """
+    tz = tz or _tz()
+    d0 = ts.astimezone(tz).date()
+    best: tuple[ShiftDef, date, datetime, datetime] | None = None
+    for s in shifts:
+        for k in range(3):
+            d = d0 - timedelta(days=k)
+            a, b = shift_bounds(s, d, tz)
+            if b > ts or (best is not None and b <= best[3]):
+                continue
+            if s in active_set(shifts, a):
+                best = (s, d, a, b)
+    return best
+
+
 class ShiftResolver:
     """DB dagi smenalarni keshlab, hodisa vaqtida smenani aniqlaydi."""
 
@@ -106,8 +127,15 @@ class ShiftResolver:
     def invalidate(self) -> None:
         self._loaded_at = None
 
-    async def resolve(self, session: AsyncSession, ts: datetime) -> ShiftMatch | None:
+    async def _ensure(self, session: AsyncSession) -> None:
         now = datetime.now().astimezone()
         if self._loaded_at is None or now - self._loaded_at > self._ttl:
             await self.load(session)
+
+    async def resolve(self, session: AsyncSession, ts: datetime) -> ShiftMatch | None:
+        await self._ensure(session)
         return match_shift(self._shifts, ts)
+
+    async def last_ended(self, session: AsyncSession, ts: datetime) -> tuple[ShiftDef, date, datetime, datetime] | None:
+        await self._ensure(session)
+        return last_ended_shift(self._shifts, ts)

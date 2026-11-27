@@ -137,8 +137,11 @@ REGISTRY: dict[str, MessageType] = {
             "report",
             (),  # hodisadan emas — telegram-service jadval bo'yicha yuboradi
             r_shift_report,
-            {"minutes": 60},
-            param_labels={"minutes": "daqiqada bir (smena oxirida — yakuniy)"},
+            {"minutes": 60, "delay": 30},
+            param_labels={
+                "minutes": "daqiqada bir (smena davomida)",
+                "delay": "daqiqa — smena tugagach yakuniy hisobot",
+            },
         ),
         MessageType("camera_offline", "Kamera uzildi", "system", ("camera_offline",), r_cam_off),
         MessageType("camera_online", "Kamera tiklandi", "system", ("camera_online",), r_cam_on),
