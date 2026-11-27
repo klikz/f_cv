@@ -1,4 +1,4 @@
-.PHONY: install start stop restart status logs dev migrate test lint fmt build serve
+.PHONY: install start stop restart status logs dev migrate test lint fmt build serve push
 
 install:            ## Bog'liqliklarni o'rnatish
 	cd backend && uv sync
@@ -39,3 +39,12 @@ build:              ## Frontend production build (API uni / da beradi)
 
 serve: build        ## Production rejimiga yaqin: build + servislar (Vite'siz), http://localhost:8100
 	./scripts/dev.sh --no-frontend
+
+push:               ## GitHub'ga yuklash: make push M="xabar" (M bo'lmasa — sana bilan)
+	git add -A
+	@if git diff --cached --quiet; then \
+		echo "Commit qilinadigan o'zgarish yo'q"; \
+	else \
+		git commit -m "$(or $(M),Yangilanish: $(shell date '+%Y-%m-%d %H:%M'))"; \
+	fi
+	git push origin $$(git branch --show-current)

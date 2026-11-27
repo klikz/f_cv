@@ -1,5 +1,5 @@
 import { Cpu, Loader2, Plus, Ruler, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Progress } from '@/components/common/progress'
@@ -15,15 +15,14 @@ type Out = { items: CamProduct[]; available: CamProduct[]; load: { per_camera: R
 export function CountingProducts({ cameraId }: { cameraId: number }) {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['cam-products', cameraId], queryFn: () => api.get<Out>(`/cameras/${cameraId}/counting/products`), refetchInterval: 5000 })
-  const [pick, setPick] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => setPick(''), [data?.available.length])
 
   const save = async (items: CamProduct[]) => {
     setBusy(true)
     try {
       const out = await api.put<Out>(`/cameras/${cameraId}/counting/products`, { items })
       qc.setQueryData(['cam-products', cameraId], out)
+      notify.success('Mahsulotlar saqlandi')
     } catch (e) {
       notify.error("Saqlab bo'lmadi", e)
     } finally {
@@ -61,23 +60,26 @@ export function CountingProducts({ cameraId }: { cameraId: number }) {
         ))}
       </div>
       {data.available.length > 0 ? (
-        <div className="flex gap-2">
-          <Select value={pick} onValueChange={setPick}>
-            <SelectTrigger className="h-8 flex-1">
-              <SelectValue placeholder="Mahsulot qo'shish" />
-            </SelectTrigger>
-            <SelectContent>
-              {data.available.map((p) => (
-                <SelectItem key={p.product_id} value={String(p.product_id)}>
-                  {p.name} (v{p.active_version})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" disabled={!pick || busy} onClick={() => { const p = data.available.find((x) => String(x.product_id) === pick); if (p) void save([...data.items, p]) }}>
-            <Plus />
-          </Button>
-        </div>
+        <Select
+          value=""
+          disabled={busy}
+          onValueChange={(v) => {
+            const p = data.available.find((x) => String(x.product_id) === v)
+            if (p) void save([...data.items, p])
+          }}
+        >
+          <SelectTrigger className="h-8 w-full">
+            <Plus className="size-4" />
+            <SelectValue placeholder="Mahsulot qo'shish (darhol saqlanadi)" />
+          </SelectTrigger>
+          <SelectContent>
+            {data.available.map((p) => (
+              <SelectItem key={p.product_id} value={String(p.product_id)}>
+                {p.name} (v{p.active_version})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
         data.items.length === 0 && (
           <p className="text-xs text-muted-foreground">

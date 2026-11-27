@@ -144,7 +144,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, r: Rect, meta: FrameM
     }
     for (const d of c.detections ?? []) {
       const [x1, y1, x2, y2] = d.bbox
-      const color = d.counted ? pal.success : pal.box
+      const color = d.counted ? pal.success : pal.warning
       ctx.save()
       ctx.strokeStyle = color
       ctx.lineWidth = sc.line
