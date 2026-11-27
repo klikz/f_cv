@@ -83,12 +83,16 @@ def abs_path(rel: str) -> Path:
     return p
 
 
-def roi_crop_box(
-    roi: list | None, w: int, h: int, margin: float = 0.06, min_size: int = 64
-) -> tuple[int, int, int, int]:
-    """ROI poligonining chegara to'rtburchagi (zaxira bilan), piksel. ROI yo'q bo'lsa — butun kadr.
+ROI_FILL = (114, 114, 114)  # ROI tashqarisi — YOLO letterbox rangi (model uchun "bo'sh joy")
 
-    Train va inference bir xil kesimdan foydalanadi (PLAN.md 1.6: kirish — ROI atrofidan kesilgan kadr).
+
+def roi_crop_box(
+    roi: list | None, w: int, h: int, margin: float = 0.0, min_size: int = 64
+) -> tuple[int, int, int, int]:
+    """ROI poligonining chegara to'rtburchagi, piksel. ROI yo'q bo'lsa — butun kadr.
+
+    Train va inference bir xil kesimdan foydalanadi (PLAN.md 1.6: kirish — ROI kesimi, tashqarisi
+    `mask_outside_roi` bilan bo'yalgan).
     """
     if not roi:
         return 0, 0, w, h
@@ -102,3 +106,15 @@ def roi_crop_box(
     if bx2 - bx1 < min_size or by2 - by1 < min_size:
         return 0, 0, w, h
     return bx1, by1, bx2, by2
+
+
+def mask_outside_roi(img: np.ndarray, roi: list | None, box: tuple[int, int, int, int] | list[int], w: int, h: int):
+    """`img` — (w×h) kadrning `box` kesimi. ROI poligonidan tashqari piksellar ROI_FILL bilan bo'yaladi (joyida)."""
+    if not roi or len(roi) < 3:
+        return img
+    x1, y1 = box[0], box[1]
+    pts = np.array([[p[0] * w - x1, p[1] * h - y1] for p in roi], dtype=np.float64)
+    mask = np.zeros(img.shape[:2], np.uint8)
+    cv2.fillPoly(mask, [np.round(pts).astype(np.int32)], 255)
+    img[mask == 0] = ROI_FILL
+    return img

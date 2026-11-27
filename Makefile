@@ -1,4 +1,4 @@
-.PHONY: install start stop restart status logs dev migrate test lint fmt build serve push
+.PHONY: install start stop restart status logs dev migrate test lint fmt build serve push update
 
 install:            ## Bog'liqliklarni o'rnatish
 	cd backend && uv sync
@@ -48,3 +48,6 @@ push:               ## GitHub'ga yuklash: make push M="xabar" (M bo'lmasa — sa
 		git commit -m "$(or $(M),Yangilanish: $(shell date '+%Y-%m-%d %H:%M'))"; \
 	fi
 	git push origin $$(git branch --show-current)
+
+update:             ## GitHub'dan yangilash: kod + bog'liqliklar + migratsiya + build + restart (FORCE=1 — majburiy)
+	FORCE=$(FORCE) ./scripts/update.sh

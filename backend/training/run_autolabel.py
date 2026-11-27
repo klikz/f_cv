@@ -5,6 +5,7 @@ import sys
 
 import cv2
 
+from app.services.images import mask_outside_roi
 from training.ml_env import setup_ultralytics_env
 
 
@@ -21,7 +22,7 @@ def main() -> None:
             continue
         h, w = img.shape[:2]
         x1, y1, x2, y2 = it["crop"]
-        crop = img[y1:y2, x1:x2]
+        crop = mask_outside_roi(img[y1:y2, x1:x2].copy(), it.get("roi"), (x1, y1, x2, y2), w, h)
         r = model.predict(crop, imgsz=req.get("imgsz", 640), conf=conf, verbose=False, device=0)[0]
         boxes = []
         for b, c in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist(), strict=False):

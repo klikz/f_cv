@@ -61,7 +61,6 @@ export function SnapshotPanel({ cameraId, productId, productName }: { cameraId: 
   useHotkeys([{ combo: 's', handler: () => void snapshot() }])
 
   const pts = roi?.roi ?? []
-  const crop = roi?.crop
   const px = (p: Point) => `${(rect?.x ?? 0) + p[0] * (rect?.w ?? 0)},${(rect?.y ?? 0) + p[1] * (rect?.h ?? 0)}`
 
   return (
@@ -70,24 +69,9 @@ export function SnapshotPanel({ cameraId, productId, productName }: { cameraId: 
         <VideoCanvas hub={hub} cameraId={cameraId} onRect={onRect} onStale={setStale}>
           {rect && hasRoi && (
             <svg className="pointer-events-none absolute inset-0 h-full w-full">
-              {mode === 'roi' && crop && (
-                <>
-                  {/* kesimdan tashqarisi xiralashtiriladi */}
-                  <path
-                    fillRule="evenodd"
-                    className="fill-black/55"
-                    d={`M${rect.x},${rect.y}h${rect.w}v${rect.h}h${-rect.w}z M${rect.x + crop[0] * rect.w},${rect.y + crop[1] * rect.h}V${rect.y + crop[3] * rect.h}H${rect.x + crop[2] * rect.w}V${rect.y + crop[1] * rect.h}z`}
-                  />
-                  <rect
-                    x={rect.x + crop[0] * rect.w}
-                    y={rect.y + crop[1] * rect.h}
-                    width={(crop[2] - crop[0]) * rect.w}
-                    height={(crop[3] - crop[1]) * rect.h}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth={1.5}
-                  />
-                </>
+              {mode === 'roi' && pts.length >= 3 && (
+                /* faqat ROI ichi saqlanadi — tashqarisi xiralashtiriladi */
+                <path fillRule="evenodd" className="fill-black/55" d={`M${rect.x},${rect.y}h${rect.w}v${rect.h}h${-rect.w}z M${pts.map(px).join(' L')}z`} />
               )}
               <polygon points={pts.map(px).join(' ')} fill="var(--overlay-roi)" fillOpacity={0.08} stroke="var(--overlay-roi)" strokeWidth={2} strokeDasharray="6 4" />
             </svg>
@@ -121,7 +105,7 @@ export function SnapshotPanel({ cameraId, productId, productName }: { cameraId: 
               </Link>
             </p>
           )}
-          {hasRoi && mode === 'roi' && <p className="mt-1.5 text-xs text-muted-foreground">Faqat ROI atrofidagi kesim saqlanadi — model ham shu kesimni ko'radi.</p>}
+          {hasRoi && mode === 'roi' && <p className="mt-1.5 text-xs text-muted-foreground">Faqat ROI ichi saqlanadi (tashqarisi kulrang) — model ham aynan shuni ko'radi.</p>}
         </div>
 
         <div>

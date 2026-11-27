@@ -308,6 +308,7 @@ class CountingTask:
             "kind": self.logic.analysis_kind,
             "seq": seq,
             "crop": list(crop),
+            "roi": self.cfg.roi_polygon or None,
             "products": self.products,
             "conf": float(self.cfg.conf_threshold),
             "ts": time.time(),

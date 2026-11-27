@@ -25,6 +25,7 @@ from redis import Redis
 
 from app.core import keys
 from app.core.config import get_settings
+from app.services.images import mask_outside_roi
 from vision.video.shm import ReaderCache
 
 log = logging.getLogger(__name__)
@@ -165,7 +166,10 @@ class InferenceServer:
                 continue
             h, w = fr.shape[:2]
             x1, y1, x2, y2 = rq.get("crop") or (0, 0, w, h)
-            crops[i] = (np.ascontiguousarray(fr[y1:y2, x1:x2]), (x1, y1, x2, y2), w, h)
+            img = fr[y1:y2, x1:x2].copy() if rq.get("roi") else np.ascontiguousarray(fr[y1:y2, x1:x2])
+            # train bilan bir xil: ROI poligonidan tashqarisi bo'yaladi
+            mask_outside_roi(img, rq.get("roi"), (x1, y1, x2, y2), w, h)
+            crops[i] = (img, (x1, y1, x2, y2), w, h)
             for pr in rq["products"]:
                 by_engine.setdefault(pr["engine"], []).append(i)
         results: dict[int, list[dict]] = {i: [] for i in crops}

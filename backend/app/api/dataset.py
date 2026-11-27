@@ -14,7 +14,16 @@ from app.core.config import get_settings
 from app.models.cameras import Camera
 from app.models.catalog import Annotation, DatasetImage, Product
 from app.models.tasks import CountingConfig, EquipmentConfig
-from app.services.images import abs_path, dhash, hamming, images_root, roi_crop_box, save_jpeg, task_dir
+from app.services.images import (
+    abs_path,
+    dhash,
+    hamming,
+    images_root,
+    mask_outside_roi,
+    roi_crop_box,
+    save_jpeg,
+    task_dir,
+)
 from app.services.settings_store import get_setting, set_setting
 from app.services.snapshot import grab_live_frame
 
@@ -324,6 +333,8 @@ async def take_snapshot(data: SnapshotIn, session: SessionDep, redis: RedisDep) 
         if (x1, y1, x2, y2) != (0, 0, fw, fh):
             frame = frame[y1:y2, x1:x2].copy()
             crop = [x1 / fw, y1 / fh, x2 / fw, y2 / fh]
+        # faqat ROI ichi: poligondan tashqarisi bo'yaladi (model inference'da ham shuni ko'radi)
+        mask_outside_roi(frame, roi, (x1, y1, x2, y2), fw, fh)
     rel = save_jpeg(frame, task_dir(await images_root(session), cam.id, "counting") / "dataset")
     img = DatasetImage(
         camera_id=cam.id,

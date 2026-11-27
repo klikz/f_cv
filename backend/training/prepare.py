@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.catalog import Annotation, DatasetImage, Product
 from app.models.tasks import CountingConfig
-from app.services.images import roi_crop_box
+from app.services.images import mask_outside_roi, roi_crop_box
 
 
 @dataclass
@@ -89,6 +89,8 @@ def build_dataset(
         # ROI bo'yicha kesib saqlangan rasm qayta kesilmaydi
         x1, y1, x2, y2 = (0, 0, w, h) if img.crop else roi_crop_box(rois.get(img.camera_id or -1), w, h)
         crop = frame[y1:y2, x1:x2]
+        if not img.crop:  # ROI kesimi bilan olingan snapshot allaqachon niqoblangan
+            crop = mask_outside_roi(crop.copy(), rois.get(img.camera_id or -1), (x1, y1, x2, y2), w, h)
         cw, ch = x2 - x1, y2 - y1
         lines = []
         for a in anns:

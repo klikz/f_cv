@@ -627,6 +627,7 @@ class TrainerService:
                     "crop": [0, 0, im.width, im.height]
                     if im.crop
                     else list(roi_crop_box(rois.get(im.camera_id or -1), im.width, im.height)),
+                    "roi": None if im.crop else rois.get(im.camera_id or -1),
                 }
             )
         if not items:
