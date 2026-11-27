@@ -68,7 +68,7 @@ class TrainingJob(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     camera_id: Mapped[int | None] = mapped_column(ForeignKey("cameras.id", ondelete="SET NULL"), nullable=True)
-    kind: Mapped[str] = mapped_column(String(8), default="full")  # full | draft
+    kind: Mapped[str] = mapped_column(String(16), default="full")  # full | draft | autolabel
     params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(10), default="queued", index=True)
     stage: Mapped[str] = mapped_column(String(10), default="queued")

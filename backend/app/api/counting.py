@@ -47,13 +47,21 @@ class CamProductsOut(BaseModel):
     load: dict
 
 
-async def _active_versions(session) -> dict[int, ModelVersion]:
+async def _active_versions(session, camera_id: int) -> dict[int, ModelVersion]:
+    """Har mahsulot uchun faol versiya: kameraga xos bo'lsa o'sha, bo'lmasa umumiy (vision worker bilan bir xil)."""
     rows = (
         await session.execute(
-            select(ModelVersion).where(ModelVersion.is_active.is_(True), ModelVersion.camera_id.is_(None))
+            select(ModelVersion).where(
+                ModelVersion.is_active.is_(True),
+                (ModelVersion.camera_id == camera_id) | ModelVersion.camera_id.is_(None),
+            )
         )
     ).scalars()
-    return {r.product_id: r for r in rows}
+    out: dict[int, ModelVersion] = {}
+    for r in rows:
+        if r.product_id not in out or r.camera_id is not None:
+            out[r.product_id] = r
+    return out
 
 
 async def _load_info(session, redis) -> dict:
@@ -94,7 +102,7 @@ async def get_cam_products(camera_id: int, session: SessionDep, redis: RedisDep)
     if await session.get(Camera, camera_id) is None:
         raise not_found("Kamera topilmadi")
     prods = {p.id: p for p in (await session.execute(select(Product).order_by(Product.name))).scalars()}
-    act = await _active_versions(session)
+    act = await _active_versions(session, camera_id)
     rows = (
         (await session.execute(select(CountingConfigProduct).where(CountingConfigProduct.camera_id == camera_id)))
         .scalars()
@@ -137,7 +145,7 @@ async def get_cam_products(camera_id: int, session: SessionDep, redis: RedisDep)
 async def put_cam_products(camera_id: int, data: CamProductsIn, session: SessionDep, redis: RedisDep) -> CamProductsOut:
     if await session.get(Camera, camera_id) is None:
         raise not_found("Kamera topilmadi")
-    act = await _active_versions(session)
+    act = await _active_versions(session, camera_id)
     existing = {
         r.product_id: r
         for r in (

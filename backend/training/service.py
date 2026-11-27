@@ -239,7 +239,14 @@ class TrainerService:
     async def run(self, stop: asyncio.Event) -> None:
         await self.recover()
         while not stop.is_set():
-            job = await self.next_job()
+            try:
+                job = await self.next_job()
+            except Exception:
+                # vaqtinchalik DB xatosi (masalan, migratsiyadan keyin eskirgan prepared statement) jarayonni yiqitmasin
+                log.exception("Navbatdagi jobni olishda xato — qayta urinamiz")
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), 5.0)
+                continue
             if job is None:
                 await self.resume_inference()
                 with contextlib.suppress(TimeoutError):
