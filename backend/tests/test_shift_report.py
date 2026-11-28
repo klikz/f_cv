@@ -1,4 +1,4 @@
-"""Telegram "Smena hisoboti": jadval (oraliq + yakuniy), ko'rsatkichlar va matn."""
+"""Telegram "Smena hisoboti": faqat smena tugagach yakuniy, ko'rsatkichlar va matn."""
 
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -51,7 +51,7 @@ async def _setup(db):
                 camera_id=cam.id,
                 task_type="report",
                 message_type="shift_report",
-                params={"minutes": 60},
+                params={},
             ),
         ]
     )
@@ -84,38 +84,29 @@ async def test_shift_report_schedule(db, redis, monkeypatch):
         db.expire_all()
         return (await db.execute(select(NotificationOutbox).order_by(NotificationOutbox.id))).scalars().all()
 
-    await s.shift_report_tick()  # obuna smena o'rtasida boshlandi — darhol yubormaydi
+    # smena davomida (soatlab ham) hech narsa yuborilmaydi
+    for h, m in ((9, 5), (10, 0), (11, 0), (15, 0), (18, 59)):
+        clock["t"] = local(27, h, m, 20)
+        await s.shift_report_tick()
     assert await outbox() == []
-
-    clock["t"] = local(27, 9, 30)
-    await s.shift_report_tick()
-    assert await outbox() == []
-
-    clock["t"] = local(27, 10, 0, 20)  # 2-slot
-    await s.shift_report_tick()
-    rows = await outbox()
-    assert len(rows) == 1 and rows[0].message_type == "shift_report"
-    txt = rows[0].text
-    assert "Smena hisoboti" in txt and "Liniya 1" in txt
-    assert "Sanaldi: <b>3</b>" in txt and "oxirgi 60 daq: 1" in txt and "Model A — 3" in txt
-    assert "Ishladi: <b>1 soat 0 daq</b>" in txt and "(1 marta)" in txt
-
-    await s.shift_report_tick()  # shu slotda takror yo'q
-    assert len(await outbox()) == 1
 
     clock["t"] = local(27, 19, 0, 30)  # smena tugadi — yakuniy hali emas (30 daq kechikish)
     await s.shift_report_tick()
-    assert len(await outbox()) == 1
+    assert await outbox() == []
 
     clock["t"] = local(27, 19, 30, 10)  # tugaganiga 30 daq → yakuniy
     await s.shift_report_tick()
     rows = await outbox()
-    assert len(rows) == 2
-    assert "Smena yakuni" in rows[1].text and "08:00 – 19:00" in rows[1].text
+    assert len(rows) == 1 and rows[0].message_type == "shift_report"
+    txt = rows[0].text
+    assert "Smena yakuni" in txt and "08:00 – 19:00" in txt and "Liniya 1" in txt
+    assert "Sanaldi: <b>3</b>" in txt and "Model A — 3" in txt and "oxirgi" not in txt
+    assert "Ishladi: <b>1 soat 0 daq</b>" in txt and "(1 marta)" in txt
 
-    clock["t"] = local(27, 19, 31)
-    await s.shift_report_tick()
-    assert len(await outbox()) == 2
+    for h, m in ((19, 31), (20, 30), (23, 0)):  # tungi smena davomida — takror ham, oraliq ham yo'q
+        clock["t"] = local(27, h, m)
+        await s.shift_report_tick()
+    assert len(await outbox()) == 1
 
 
 async def test_shift_report_final_after_downtime(db, redis, monkeypatch):
@@ -124,7 +115,7 @@ async def test_shift_report_final_after_downtime(db, redis, monkeypatch):
 
     await _setup(db)
     sub = (await db.execute(select(TelegramSubscription))).scalars().one()
-    sub.params = {"minutes": 60, "delay": 10}
+    sub.params = {"delay": 10}
     await db.commit()
     clock = {"t": local(27, 18, 0)}
     monkeypatch.setattr(svc, "now", lambda: clock["t"].astimezone(UTC))

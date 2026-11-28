@@ -76,7 +76,7 @@ def r_train_failed(e: dict, ctx: dict) -> str:
 
 
 def r_shift_report(e: dict, ctx: dict) -> str:
-    """e: {shift, shift_date, start, end, final, interval_min, summary} (start/end — unix ts)."""
+    """e: {shift, shift_date, start, end, final, summary} (start/end — unix ts)."""
     sm = e["summary"]
     head = "🏁 <b>Smena yakuni</b>" if e.get("final") else "📊 <b>Smena hisoboti</b>"
     till = _t(e["end"])[:5] + ("" if e.get("final") else " (hozir)")
@@ -87,8 +87,7 @@ def r_shift_report(e: dict, ctx: dict) -> str:
     ]
     c = sm.get("counting")
     if c is not None:
-        rec = f" (oxirgi {e['interval_min']} daq: {c['recent']})" if c.get("recent") is not None else ""
-        lines += ["", f"📦 Sanaldi: <b>{c['total']}</b> ta{rec}"]
+        lines += ["", f"📦 Sanaldi: <b>{c['total']}</b> ta"]
         lines += [f"  • {p['name']} — {p['count']}" for p in c["by_product"][:10]]
         if len(c["by_product"]) > 10:
             lines.append(f"  • boshqalar — {sum(p['count'] for p in c['by_product'][10:])}")
@@ -137,9 +136,8 @@ REGISTRY: dict[str, MessageType] = {
             "report",
             (),  # hodisadan emas — telegram-service jadval bo'yicha yuboradi
             r_shift_report,
-            {"minutes": 60, "delay": 30},
+            {"delay": 30},
             param_labels={
-                "minutes": "daqiqada bir (smena davomida)",
                 "delay": "daqiqa — smena tugagach yakuniy hisobot",
             },
         ),

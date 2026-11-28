@@ -145,7 +145,7 @@ function Matrix({ chat, types }: { chat: Chat; types: MsgType[] }) {
             Object.entries(t.params).map(([k, dv]) => (
               <label key={`${t.code}-${k}`} className="flex items-center gap-2 text-sm">
                 "{t.title}" — N =
-                <Input type="number" min={t.code === 'shift_report' ? (k === 'delay' ? 0 : 5) : 1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
+                <Input type="number" min={t.code === 'shift_report' ? 0 : 1} className="num h-7 w-16" value={param(t.code, k) ?? dv} onChange={(e) => setParam(t.code, k, Number(e.target.value))} />
                 {t.param_labels?.[k] ?? 'daqiqa'}
               </label>
             )),
